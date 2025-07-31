@@ -2,14 +2,22 @@
 import cv2
 import numpy as np
 
-file_name = ('../img/gaussian_noise.jpg')
-img = cv2.imread(file_name)
+img = cv2.imread('../img/gaussian_noise.jpg')
 
-blur1 = cv2.blur(img, (10,10))
+k1 = np.array([[1,2,1],
+               [2,4,2],
+               [1,2,1]]) *(1/16)
+blur1 = cv2.filter2D(img, -1, k1)
 
-blur2 = cv2.boxFilter(img, -1, (10,10))
+k2 = cv2.getGaussianKernel(3,0)
+blur2 = cv2.filter2D(img, -1, k2*k2.T)
 
-merged = np.hstack((img, blur1, blur2))
-cv2.imshow('blur', merged)
+blur3 = cv2.GaussianBlur(img, (3, 3), 0)
+
+print('k1:', k1)
+print('k2:', k2*k2.T)
+
+merged = np.hstack((img, blur1, blur2, blur3))
+cv2.imshow('gaussian blur', merged)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
