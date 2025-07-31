@@ -17,42 +17,43 @@ for path in image_paths:
         print(f"이미지 로드 실패: {path}")
         continue
 
-    # 전역 변수 초기화
     pts = np.zeros((4, 2), dtype=np.float32)
     pts_cnt = 0
     draw = img.copy()
 
-    # 마우스 콜백 함수 정의
     def onMouse(event, x, y, flags, param):
-        global pts_cnt, pts, draw
+        global pts_cnt, pts, draw  # 이 코드가 for-loop 안이므로 nonlocal 사용 가능 (Python 3.x 이상)
 
         if event == cv2.EVENT_LBUTTONDOWN and pts_cnt < 4:
-            # 좌표 저장 및 표시
             pts[pts_cnt] = [x, y]
             pts_cnt += 1
 
-            cv2.circle(draw, (x, y), 5, (0, 255, 255), -1)  # 노란색 점
-            cv2.putText(draw, str(pts_cnt), (x + 10, y - 10),
+cv2.circle(draw, (x, y), 5, (0, 255, 255), -1)
+cv2.putText(draw, str(pts_cnt), (x + 10, y - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            cv2.imshow("License Plate Extractor - Original", draw)
+cv2.imshow("License Plate Extractor - Original", draw)
 
-            # 4점 클릭 완료 시 원근 변환
-            if pts_cnt == 4:
-                width, height = 300, 100
-                dst_pts = np.array([
-                    [0, 0],
-                    [width - 1, 0],
-                    [width - 1, height - 1],
-                    [0, height - 1]
-                ], dtype=np.float32)
+if pts_cnt == 4:
+   width, height = 300, 100
+   dst_pts = np.array([
+     [0, 0],
+     [width - 1, 0],
+     [width - 1, height - 1],
+    [0, height - 1] ], dtype=np.float32)
 
-                M = cv2.getPerspectiveTransform(pts, dst_pts)
-                result = cv2.warpPerspective(img, M, (width, height))
-                cv2.imshow("License Plate Extractor - Warped", result)
+M = cv2.getPerspectiveTransform(pts, dst_pts)
+result = cv2.warpPerspective(img, M, (width, height))
 
-    print(f"{path} 파일: 번호판 영역을 시계 방향으로 4점 클릭하세요.")
-    cv2.imshow("License Plate Extractor - Original", draw)
-    cv2.setMouseCallback("License Plate Extractor - Original", onMouse)
+                # 그레이스케일 변환
+gray_plate = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+                # 결과 출력
+cv2.imshow("License Plate Extractor - Warped (Color)", result)
+cv2.imshow("License Plate Extractor - Warped (Grayscale)", gray_plate)
+
+print(f"\n{path} 파일: 번호판 영역을 시계 방향으로 4점 클릭하세요.")
+cv2.imshow("License Plate Extractor - Original", draw)
+cv2.setMouseCallback("License Plate Extractor - Original", onMouse)
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
