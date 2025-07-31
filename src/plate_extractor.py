@@ -19,27 +19,14 @@ img = None
 
 # 번호판 전용 적응형 임계처리 함수
 def adaptive_threshold_plate(enhanced_plate):
-    """번호판 전용 적응형 임계처리"""
-
-    # 1단계: 가벼운 블러링 (노이즈 제거, 글자는 보존)
     blurred = cv2.GaussianBlur(enhanced_plate, (3, 3), 0)
-
-    # 2단계: 번호판 최적화 적응형 임계처리
     thresh_adaptive = cv2.adaptiveThreshold(
-        blurred,
-        maxValue=255,
-        adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        thresholdType=cv2.THRESH_BINARY,  # 일반 BINARY 사용
-        blockSize=11,
-        C=2
+        blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY, 11, 2
     )
-
-    # 3단계: Otsu 임계처리와 비교
     _, thresh_otsu = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    # 4단계: 결과 비교 시각화
     plt.figure(figsize=(16, 4))
-
     plt.subplot(1, 4, 1)
     plt.imshow(enhanced_plate, cmap='gray')
     plt.title('Enhanced Plate')
@@ -64,6 +51,66 @@ def adaptive_threshold_plate(enhanced_plate):
     plt.show()
 
     return thresh_adaptive, thresh_otsu
+
+# 윤곽선 검출 함수
+def find_contours_in_plate(thresh_plate):
+    contours, hierarchy = cv2.findContours(thresh_plate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    height, width = thresh_plate.shape
+    contour_image = cv2.cvtColor(thresh_plate, cv2.COLOR_GRAY2BGR)
+
+    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255),
+              (255, 255, 0), (255, 0, 255), (0, 255, 255),
+              (128, 0, 128), (255, 165, 0)]
+
+    for i, contour in enumerate(contours):
+        color = colors[i % len(colors)]
+        cv2.drawContours(contour_image, [contour], -1, color, 2)
+        M = cv2.moments(contour)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+            cv2.putText(contour_image, str(i+1), (cx-5, cy+5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+
+    # 바운딩 박스 이미지
+    contour_info = np.zeros((height, width, 3), dtype=np.uint8)
+    for i, contour in enumerate(contours):
+        area = cv2.contourArea(contour)
+        x, y, w, h = cv2.boundingRect(contour)
+        cv2.rectangle(contour_info, (x, y), (x+w, y+h), colors[i % len(colors)], 1)
+        cv2.putText(contour_info, f'A:{int(area)}', (x, y-2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.25, (255, 255, 255), 1)
+
+    # 시각화
+    plt.figure(figsize=(15, 5))
+    plt.subplot(1, 3, 1)
+    plt.imshow(thresh_plate, cmap='gray')
+    plt.title('Binary Plate')
+    plt.axis('off')
+
+    plt.subplot(1, 3, 2)
+    plt.imshow(contour_image)
+    plt.title(f'Contours Detected: {len(contours)}')
+    plt.axis('off')
+
+    plt.subplot(1, 3, 3)
+    plt.imshow(contour_info)
+    plt.title('Bounding Rectangles')
+    plt.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
+    # 정보 출력
+    print("=== 윤곽선 검출 결과 ===")
+    print(f"총 윤곽선 개수: {len(contours)}")
+    for i, contour in enumerate(contours):
+        area = cv2.contourArea(contour)
+        x, y, w, h = cv2.boundingRect(contour)
+        aspect_ratio = w / h if h > 0 else 0
+        print(f"윤곽선 {i+1}: 면적={area:.0f}, 크기=({w}×{h}), 비율={aspect_ratio:.2f}")
+
+    return contours, contour_image
 
 # 마우스 콜백 함수
 def onMouse(event, x, y, flags, param):
@@ -90,21 +137,18 @@ def onMouse(event, x, y, flags, param):
             M = cv2.getPerspectiveTransform(pts, dst_pts)
             result = cv2.warpPerspective(img, M, (width, height))
 
-            # 1. 그레이스케일 변환
             gray_plate = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
-            # 2. 대비 극대화를 위한 전처리 (OCR 최적화)
             enhanced_plate = cv2.adaptiveThreshold(
-                gray_plate,
-                maxValue=255,
-                adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                thresholdType=cv2.THRESH_BINARY,
-                blockSize=11,
-                C=2
+                gray_plate, 255,
+                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY, 11, 2
             )
 
-            # 3. 번호판 전용 적응형 임계처리 함수 호출
             thresh_adaptive, thresh_otsu = adaptive_threshold_plate(enhanced_plate)
+
+            # 윤곽선 검출 및 시각화
+            contours, contour_result = find_contours_in_plate(thresh_adaptive)
 
             # 결과 출력
             cv2.imshow("License Plate Extractor - Warped (Color)", result)
@@ -124,6 +168,7 @@ for path in image_paths:
     pts_cnt = 0
     draw = img.copy()
 
+    print(f"\n{path} 파일: 번호판 영역을 시계 방향으로 4점 클릭하세요.")
     cv2.imshow("License Plate Extractor - Original", draw)
     cv2.setMouseCallback("License Plate Extractor - Original", onMouse)
 
