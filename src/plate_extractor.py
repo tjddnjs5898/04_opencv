@@ -50,7 +50,7 @@ for path in image_paths:
                 result = cv2.warpPerspective(img, M, (width, height))
                 cv2.imshow("License Plate Extractor - Warped", result)
 
-    print(f"🔎 {path} 파일: 번호판 영역을 시계 방향으로 4점 클릭하세요.")
+    print(f"{path} 파일: 번호판 영역을 시계 방향으로 4점 클릭하세요.")
     cv2.imshow("License Plate Extractor - Original", draw)
     cv2.setMouseCallback("License Plate Extractor - Original", onMouse)
 
