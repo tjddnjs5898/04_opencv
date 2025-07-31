@@ -1,4 +1,3 @@
-# 평균 필터를 생상하여 블러 적용 (blur_avg_kernel.py)
 
 import cv2
 import numpy as np
